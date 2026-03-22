@@ -1,5 +1,4 @@
 if (typeof process !== "undefined") {
-    require("amd-loader");
     require("./test/mockdom");
 }
 
@@ -11,6 +10,7 @@ var MockRenderer = require("./test/mockrenderer").MockRenderer;
 var JavaScriptMode = require("./mode/javascript").Mode;
 var HTMLMode = require("./mode/html").Mode;
 var assert = require("./test/assertions");
+var lang = require("./lib/lang");
 
 require("./multi_select");
 
@@ -24,44 +24,38 @@ var exec = function(name, times, args) {
 
 
 module.exports = {
-    "test highlightmatching": function(done) {
+    "test highlightmatching": async function(done) {
         editor = new Editor(new MockRenderer());
         editor.session.setMode(new HTMLMode);
         editor.setValue("<html><head></head> abcd</html>", 1);
         exec("gotostart", 1);
         exec("gotoright", 3);
         assert.equal(editor.$highlightPending, true);
-        setTimeout(function() {
-            assert.equal(editor.$highlightPending, false);
-            assert.ok(editor.session.$bracketHighlight);
-            assert.equal(
-                editor.session.$bracketHighlight.ranges + "",
-                "Range: [0/1] -> [0/5],Range: [0/26] -> [0/30]"
-            );
-            exec("gotoend", 1);
-            exec("gotoleft", 3);
-            assert.equal(editor.$highlightPending, true);
-            setTimeout(function() {
-                assert.equal(editor.$highlightPending, false);
 
-                editor.setValue("{}");
-                exec("gotostart", 1);
-                setTimeout(function() {
-                    assert.equal(
-                        editor.session.$bracketHighlight.ranges + "",
-                        'Range: [0/0] -> [0/2]'
-                    );
-                    exec("gotoend", 1);
-                    setTimeout(function() {
-                        assert.equal(
-                            editor.session.$bracketHighlight.ranges + "",
-                            'Range: [0/0] -> [0/2]'
-                        );
-                        done();
-                    }, 51);
-                }, 51);
-            }, 51);
-        }, 51);
+        await lang.sleep(51);
+        assert.equal(editor.$highlightPending, false);
+        assert.ok(editor.session.$bracketHighlight);
+        assert.equal(
+            editor.session.$bracketHighlight.ranges + "",
+            "Range: [0/1] -> [0/5],Range: [0/26] -> [0/30]"
+        );
+        exec("gotoend", 1);
+        exec("gotoleft", 3);
+        assert.equal(editor.$highlightPending, true);
+
+        await lang.sleep(51);
+        assert.equal(editor.$highlightPending, false);
+
+        editor.setValue("{}");
+        exec("gotostart", 1);
+
+        await lang.sleep(51);
+        assert.equal(editor.session.$bracketHighlight.ranges + "", 'Range: [0/0] -> [0/2]');
+        exec("gotoend", 1);
+
+        await lang.sleep(51);
+        assert.equal(editor.session.$bracketHighlight.ranges + "", 'Range: [0/0] -> [0/2]');
+        done();
     },
     "test modifyNumber": function() {
         editor = new Editor(new MockRenderer());
@@ -566,10 +560,14 @@ module.exports = {
         assert.equal(url, "https://www.google.com/");
     },
     "test handle events without deprecated keyCode property": function() {
-        var e = new CustomEvent("keydown"); 
-        e.code = "KeyA"; 
-        e.ctrlKey = true;
         editor = new Editor(new MockRenderer());
+        var e = new CustomEvent("keydown"); 
+        e.code = "KeyA";
+        if (editor.commands.platform === "mac") {
+            e.metaKey = true;
+        } else {
+            e.ctrlKey = true;
+        }
         editor.session.setValue("123");
         assert.equal(editor.getSelectedText(), "");
         editor.textInput.getElement().dispatchEvent(e);
@@ -590,6 +588,4 @@ module.exports = {
 };
 
 
-if (typeof module !== "undefined" && module === require.main) {
-    require("asyncjs").test.testcase(module.exports).exec();
-}
+require("./test/run")(module);

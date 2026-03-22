@@ -1,5 +1,4 @@
 if (typeof process !== "undefined") {
-    require("amd-loader");
     require("../test/mockdom");
 }
 
@@ -40,6 +39,9 @@ editor.setOptions({
     behavioursEnabled: false,
 });
 function CodeMirror(place, opts) {
+    if (!editor.container.parentNode) {
+        document.body.appendChild(editor.container);
+    }
     var cm = editor.state && editor.state.cm;
     if (cm && cm.state.currentNotificationClose)
         cm.state.currentNotificationClose();
@@ -6035,6 +6037,4 @@ var typeKey = function() {
 }();
 
 
-if (typeof module !== "undefined" && module === require.main) {
-    require("asyncjs").test.testcase(module.exports).exec();
-}
+require("../test/run")(module);

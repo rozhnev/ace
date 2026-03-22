@@ -1,5 +1,4 @@
 if (typeof process !== "undefined") {
-    require("amd-loader");
     require("./test/mockdom");
 }
 
@@ -11,6 +10,7 @@ var EditSession = require("./edit_session").EditSession;
 var VirtualRenderer = require("./virtual_renderer").VirtualRenderer;
 var vim = require("./keyboard/vim");
 var assert = require("./test/assertions");
+var lang = require("./lib/lang");
 
 function setScreenPosition(node, rect) {
     node.style.left = rect[0] + "px";
@@ -49,7 +49,7 @@ module.exports = {
         editor && editor.destroy();
         editor = null;
     },
-    "test: screen2text the column should be rounded to the next character edge" : function(done) {
+    "test: screen2text the column should be rounded to the next character edge" : function() {
         var renderer = editor.renderer;
 
         renderer.setPadding(0);
@@ -69,9 +69,8 @@ module.exports = {
         testPixelToText(10, 0, 0, 1);
         testPixelToText(14, 0, 0, 1);
         testPixelToText(15, 0, 0, 2);
-        done();
     },
-    "test: handle css transforms" : function(done) {
+    "test: handle css transforms" : function() {
         var renderer = editor.renderer;
         var fontMetrics = renderer.$fontMetrics;
         setScreenPosition(editor.container, [20, 30, 300, 100]);
@@ -115,11 +114,9 @@ module.exports = {
         assert.ok(pos1[0] - rects[2][0] < 10e-6);
         assert.ok(pos1[1] - rects[2][1] < 10e-6);
         editor.renderer.$loop._flush();
-        
-        done();
     },
     
-    "test scrollmargin + autosize": function(done) {
+    "test scrollmargin + autosize": async function(done) {
         editor.setOptions({
             maxLines: 100,
             wrap: true
@@ -127,13 +124,9 @@ module.exports = {
         editor.renderer.setScrollMargin(10, 10);
         editor.setValue("\n\n");
         editor.setValue("\n\n\n\n");
-        editor.renderer.once("afterRender", function() {
-            setTimeout(function() {
-                done();
-            }, 0);
-        });
+        await editor.renderer.once("afterRender");
+        done();
     },
-
 
     "test scrollbars after value change": function() {
         editor.container.style.height = "0px";
@@ -289,7 +282,7 @@ module.exports = {
         editor._signal("input", {});
         assert.equal(editor.renderer.content.textContent, "only visible for empty value");
     },
-    "test: highlight indent guide": function (done) {
+    "test: highlight indent guide": async function (done) {
         editor.session.setValue(
             "function Test() {\n" + "    function Inner() {\n" + "        \n" + "        \n" + "    }\n" + "}");
         editor.setOption("highlightIndentGuides", false);
@@ -315,10 +308,9 @@ module.exports = {
         editor.session.selection.clearSelection();
         editor.session.selection.$setSelection(4, 5, 4, 5);
 
-        setTimeout(() => {
-            assertIndentGuides( 2);
-            done();
-        }, 100);
+        await lang.sleep(100);
+        assertIndentGuides(2);
+        done();
     },
     "test annotation marks": function() {
         function findPointFillStyle(imageData, x, y) {
@@ -463,33 +455,34 @@ module.exports = {
 
         assert.equal(editor.session.lineWidgets, null);
     },
-    "test: brackets highlighting": function (done) {
+    "test: brackets highlighting": async function (done) {
         var renderer = editor.renderer;
         editor.session.setValue(
             "function Test() {\n" + "    function Inner(){\n" + "        \n" + "        \n" + "    }\n" + "}");
         editor.session.selection.$setSelection(1, 21, 1, 21);
         renderer.$loop._flush();
 
-        setTimeout(function () {
-            assert.ok(editor.session.$bracketHighlight);
-            assert.range(editor.session.$bracketHighlight.ranges[0], 1, 20, 1, 21);
-            assert.range(editor.session.$bracketHighlight.ranges[1], 4, 4, 4, 5);
+        await lang.sleep(60);
+        assert.ok(editor.session.$bracketHighlight);
+        assert.range(editor.session.$bracketHighlight.ranges[0], 1, 20, 1, 21);
+        assert.range(editor.session.$bracketHighlight.ranges[1], 4, 4, 4, 5);
 
-            editor.session.selection.$setSelection(1, 16, 1, 16);
-            setTimeout(function () {
-                assert.ok(editor.session.$bracketHighlight == null);
-                editor.setKeyboardHandler(vim.handler);
-                editor.session.selection.$setSelection(1, 20, 1, 20);
-                setTimeout(function () {
-                    assert.ok(editor.session.$bracketHighlight);
-                    assert.range(editor.session.$bracketHighlight.ranges[0], 1, 20, 1, 21);
-                    assert.range(editor.session.$bracketHighlight.ranges[1], 4, 4, 4, 5);
-                    done();
-                }, 60);
-            }, 60);
-        }, 60);
+        editor.session.selection.$setSelection(1, 16, 1, 16);
+
+        await lang.sleep(60);
+        assert.ok(editor.session.$bracketHighlight == null);
+        editor.setKeyboardHandler(vim.handler);
+        editor.session.selection.$setSelection(1, 20, 1, 20);
+
+        await lang.sleep(60);
+        assert.ok(editor.session.$bracketHighlight);
+        assert.range(editor.session.$bracketHighlight.ranges[0], 1, 20, 1, 21);
+        assert.range(editor.session.$bracketHighlight.ranges[1], 4, 4, 4, 5);
+        done();
     },
     "test: scroll cursor into view": function() {
+        editor.renderer.$loop._flush();
+        
         function X(n) {
             return "X".repeat(n);
         }
@@ -568,6 +561,4 @@ module.exports = {
 };
 
 
-if (typeof module !== "undefined" && module === require.main) {
-    require("asyncjs").test.testcase(module.exports).exec();
-}
+require("./test/run")(module);

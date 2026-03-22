@@ -1,5 +1,4 @@
 if (typeof process !== "undefined") {
-    require("amd-loader");
     require("../test/mockdom");
 }
 
@@ -12,6 +11,7 @@ var Mode = require("../mode/java").Mode;
 var VirtualRenderer = require("../virtual_renderer").VirtualRenderer;
 var assert = require("../test/assertions");
 var user = require("../test/user");
+var lang = require("../lib/lang");
 
 var MouseEvent = function(type, opts){
     var e = document.createEvent("MouseEvents");
@@ -37,7 +37,7 @@ function findVisibleTooltip() {
 }
 
 module.exports = {
-    setUp : function(next) {
+    setUp : function() {
         this.editor = new Editor(new VirtualRenderer());
         this.editor.container.style.position = "absolute";
         this.editor.container.style.height = "500px";
@@ -46,9 +46,8 @@ module.exports = {
         this.editor.container.style.top = "10px";
         document.body.appendChild(this.editor.container);
         editor = this.editor;
-        next();
     },
-    "test: gutter error tooltip" : function(done) {
+    "test: gutter error tooltip" : async function(done) {
         var editor = this.editor;
         var value = "";
 
@@ -65,16 +64,15 @@ module.exports = {
         annotation.dispatchEvent(new MouseEvent("move", {x: rect.left + rect.width/2, y: rect.top + rect.height/2}));
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function() {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
 
-            assert.ok(/error test/.test(tooltip.textContent));
-            annotation.dispatchEvent(new MouseEvent("move", {x: 0, y: 0}));
-            done();
-        }, 100);
+        assert.ok(/error test/.test(tooltip.textContent));
+        annotation.dispatchEvent(new MouseEvent("move", {x: 0, y: 0}));
+        done();
     },
-    "test: gutter security tooltip" : function(done) {
+    "test: gutter security tooltip" : async function(done) {
         var editor = this.editor;
         var value = "";
 
@@ -91,14 +89,13 @@ module.exports = {
         annotation.dispatchEvent(new MouseEvent("move", {x: rect.left + rect.width/2, y: rect.top + rect.height/2}));
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function() {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
-            assert.ok(/security finding test/.test(tooltip.textContent));
-            done();
-        }, 100);
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
+        assert.ok(/security finding test/.test(tooltip.textContent));
+        done();
     },
-    "test: gutter warning tooltip" : function(done) {
+    "test: gutter warning tooltip" : async function(done) {
         var editor = this.editor;
         var value = "";
 
@@ -115,14 +112,13 @@ module.exports = {
         annotation.dispatchEvent(new MouseEvent("move", {x: rect.left + rect.width/2, y: rect.top + rect.height/2}));
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function() {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
-            assert.ok(/warning test/.test(tooltip.textContent));
-            done();
-        }, 100);
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
+        assert.ok(/warning test/.test(tooltip.textContent));
+        done();
     },
-    "test: gutter info tooltip" : function(done) {
+    "test: gutter info tooltip" : async function(done) {
         var editor = this.editor;
         var value = "";
 
@@ -139,14 +135,13 @@ module.exports = {
         annotation.dispatchEvent(new MouseEvent("move", {x: rect.left + rect.width/2, y: rect.top + rect.height/2}));
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function() {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
-            assert.ok(/info test/.test(tooltip.textContent));
-            done();
-        }, 100);
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
+        assert.ok(/info test/.test(tooltip.textContent));
+        done();
     },
-    "test: gutter hint tooltip" : function(done) {
+    "test: gutter hint tooltip" : async function(done) {
         var editor = this.editor;
         var value = "";
 
@@ -163,12 +158,11 @@ module.exports = {
         annotation.dispatchEvent(new MouseEvent("move", {x: rect.left + rect.width/2, y: rect.top + rect.height/2}));
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function() {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
-            assert.ok(/suggestion test/.test(tooltip.textContent));
-            done();
-        }, 100);
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
+        assert.ok(/suggestion test/.test(tooltip.textContent));
+        done();
     },
     "test: gutter svg icons" : function() {
         var editor = this.editor;
@@ -184,10 +178,10 @@ module.exports = {
         var line = lines.cells[0].element;
         assert.ok(/ace_gutter-cell_svg-icons/.test(line.className));
 
-        var annotation = line.children[2].firstChild;
+        var annotation = line.childNodes[2].firstChild;
         assert.ok(/ace_icon_svg/.test(annotation.className));
     },
-    "test: error show up in fold" : function(done) {
+    "test: error show up in fold" : async function(done) {
         var editor = this.editor;
         var value = "x {" + "\n".repeat(50) + "}";
         value = value.repeat(50);
@@ -209,21 +203,20 @@ module.exports = {
         assert.equal(lines.cells[1].element.textContent, "51");
 
         // Annotation node should have fold class.
-        var annotation = lines.cells[0].element.children[2].firstChild;
+        var annotation = lines.cells[0].element.childNodes[2].firstChild;
         assert.ok(/ace_error_fold/.test(annotation.className));
 
         var row = lines.cells[0].row;
         editor.$mouseHandler.$tooltip.showTooltip(row);
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function() {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
-            assert.ok(/error in folded/.test(tooltip.textContent));
-            done();
-        }, 100);
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
+        assert.ok(/error in folded/.test(tooltip.textContent));
+        done();
     },
-    "test: security show up in fold" : function(done) {
+    "test: security show up in fold" : async function(done) {
         var editor = this.editor;
         var value = "x {" + "\n".repeat(50) + "}";
         value = value.repeat(50);
@@ -245,21 +238,20 @@ module.exports = {
         assert.equal(lines.cells[1].element.textContent, "51");
 
         // Annotation node should have fold class.
-        var annotation = lines.cells[0].element.children[2].firstChild;
+        var annotation = lines.cells[0].element.childNodes[2].firstChild;
         assert.ok(/ace_security_fold/.test(annotation.className));
 
         var row = lines.cells[0].row;
         editor.$mouseHandler.$tooltip.showTooltip(row);
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function() {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
-            assert.ok(/security finding in folded/.test(tooltip.textContent));
-            done();
-        }, 100);
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
+        assert.ok(/security finding in folded/.test(tooltip.textContent));
+        done();
     },
-    "test: warning show up in fold" : function(done) {
+    "test: warning show up in fold" : async function(done) {
         var editor = this.editor;
         var value = "x {" + "\n".repeat(50) + "}";
         value = value.repeat(50);
@@ -281,19 +273,18 @@ module.exports = {
         assert.equal(lines.cells[1].element.textContent, "51");
 
         // Annotation node should have fold class.
-        var annotation = lines.cells[0].element.children[2].firstChild;
+        var annotation = lines.cells[0].element.childNodes[2].firstChild;
         assert.ok(/ace_warning_fold/.test(annotation.className));
 
         var row = lines.cells[0].row;
         editor.$mouseHandler.$tooltip.showTooltip(row);
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function() {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
-            assert.ok(/warning in folded/.test(tooltip.textContent));
-            done();
-        }, 100);
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
+        assert.ok(/warning in folded/.test(tooltip.textContent));
+        done();
     },
     "test: info not show up in fold" : function() {
         var editor = this.editor;
@@ -317,7 +308,7 @@ module.exports = {
         assert.equal(lines.cells[1].element.textContent, "51");
 
         // Annotation node should NOT have fold class.
-        var annotation = lines.cells[0].element.children[2];
+        var annotation = lines.cells[0].element.childNodes[2];
         assert.notOk(/fold/.test(annotation.className));
     },
     "test: hint not show up in fold" : function() {
@@ -342,7 +333,7 @@ module.exports = {
         assert.equal(lines.cells[1].element.textContent, "51");
 
         // Annotation node should NOT have fold class.
-        var annotation = lines.cells[0].element.children[2];
+        var annotation = lines.cells[0].element.childNodes[2];
         assert.notOk(/fold/.test(annotation.className));
     },
     "test: severities are correctly ordered/ranked when folding": function() {
@@ -396,7 +387,7 @@ module.exports = {
         assert.notOk(/ace_security_fold/.test(firstLineGutterElement.className));
         assert.ok(/ace_warning_fold/.test(firstLineGutterElement.className));
     },
-    "test: gutter tooltip should properly display special characters (\" ' & <)" : function(done) {
+    "test: gutter tooltip should properly display special characters (\" ' & <)" : async function(done) {
         var editor = this.editor;
         var value = "";
 
@@ -413,14 +404,13 @@ module.exports = {
         annotation.dispatchEvent(new MouseEvent("move", {x: rect.left + rect.width/2, y: rect.top + rect.height/2}));
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function() {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
-            assert.ok(/special characters " ' & </.test(tooltip.textContent));
-            done();
-        }, 100);
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
+        assert.ok(/special characters " ' & </.test(tooltip.textContent));
+        done();
     },
-    "test: gutter hover tooltip should remain open when pressing ctrl key combination" : function(done) {
+    "test: gutter hover tooltip should remain open when pressing ctrl key combination" : async function(done) {
         var editor = this.editor;
         var value = "";
 
@@ -437,22 +427,21 @@ module.exports = {
         annotation.dispatchEvent(new MouseEvent("move", {x: rect.left + rect.width/2, y: rect.top + rect.height/2}));
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function () {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
-            assert.ok(/error test/.test(tooltip.textContent));
-            tooltip.focus();
-            user.type("Ctrl-C");
-            tooltip = findVisibleTooltip();
-            assert.ok(/error test/.test(tooltip.textContent));
-            // also verify if it closes when presses another key
-            user.type("Escape");
-            tooltip = document.body.querySelector(".ace_gutter-tooltip");
-            assert.strictEqual(tooltip.style.display, "none");
-            done();
-        }, 100);
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
+        assert.ok(/error test/.test(tooltip.textContent));
+        tooltip.focus();
+        user.type("Ctrl-C");
+        tooltip = findVisibleTooltip();
+        assert.ok(/error test/.test(tooltip.textContent));
+        // also verify if it closes when presses another key
+        user.type("Escape");
+        tooltip = document.body.querySelector(".ace_gutter-tooltip");
+        assert.strictEqual(tooltip.style.display, "none");
+        done();
     },
-    "test: gutter tooltip aria-describedby attribute": function(done) {
+    "test: gutter tooltip aria-describedby attribute": async function(done) {
         var editor = this.editor;
         var value = "";
 
@@ -470,23 +459,24 @@ module.exports = {
         element.dispatchEvent(new MouseEvent("move", {x: rect.left + rect.width/2, y: rect.top + rect.height/2}));
 
         // Wait for the tooltip to appear after its timeout.
-        setTimeout(function() {
-            editor.renderer.$loop._flush();
-            var tooltip = findVisibleTooltip();
-            assert.ok(/error test/.test(tooltip.textContent));
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        var tooltip = findVisibleTooltip();
+        assert.ok(/error test/.test(tooltip.textContent));
 
-            var ariaDescribedBy = annotation.getAttribute("aria-describedby");
-            assert.ok(ariaDescribedBy, "aria-describedby should be set when tooltip is shown");
-            assert.equal(ariaDescribedBy, tooltip.id, "aria-describedby should match tooltip id");
+        var ariaDescribedBy = annotation.getAttribute("aria-describedby");
+        assert.ok(ariaDescribedBy, "aria-describedby should be set when tooltip is shown");
+        assert.equal(ariaDescribedBy, tooltip.id, "aria-describedby should match tooltip id");
 
-            editor.container.dispatchEvent(new MouseEvent("wheel", {}));
+        editor.container.dispatchEvent(new MouseEvent("wheel", {}));
 
-            setTimeout(function() {
-                editor.renderer.$loop._flush();
-                assert.equal(annotation.getAttribute("aria-describedby"), "", "aria-describedby should be removed when tooltip is hidden");
-                done();
-            }, 100);
-        }, 100);
+        await lang.sleep(100);
+        editor.renderer.$loop._flush();
+        assert.equal(
+            annotation.getAttribute("aria-describedby"), "",
+            "aria-describedby should be removed when tooltip is hidden"
+        );
+        done();
     },
 
     tearDown : function() {
@@ -495,6 +485,4 @@ module.exports = {
     }
 };
 
-if (typeof module !== "undefined" && module === require.main) {
-    require("asyncjs").test.testcase(module.exports).exec();
-}
+require("../test/run")(module);

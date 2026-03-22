@@ -1,5 +1,4 @@
 if (typeof process !== "undefined") {
-    require("amd-loader");
     require("./test/mockdom");
 }
 
@@ -13,6 +12,7 @@ var MockRenderer = require("./test/mockrenderer").MockRenderer;
 var Range = require("./range").Range;
 var assert = require("./test/assertions");
 var JavaScriptMode = require("./mode/javascript").Mode;
+var lang = require("./lib/lang");
 
 require("./multi_select");
 
@@ -38,6 +38,15 @@ function assertArray(a, b) {
     for (var i = 0; i < a.length; i++) {
         assert.equal(a[i], b[i]);
     }
+}
+
+function insert(row, column, text, session) {
+    session.insert({row: row, column: column}, text);
+
+    // Force the session to store all changes made to the document NOW
+    // on the undoManager's queue. Otherwise we can't undo in separate
+    // steps later.
+    session.$syncInformUndoManager();
 }
 
 module.exports = {
@@ -722,55 +731,46 @@ module.exports = {
         var undoManager = session.getUndoManager();
         var foldLines = session.$foldData;
 
-        function insert(row, column, text) {
-            session.insert({row: row, column: column}, text);
-
-            // Force the session to store all changes made to the document NOW
-            // on the undoManager's queue. Otherwise we can't undo in separate
-            // steps later.
-            session.$syncInformUndoManager();
-        }
-
         var foldLine, fold, folds;
         // First line.
         foldLine = session.$foldData[0];
         fold = foldLine.folds[0];
 
-        insert(0, 0, "0");
-        assert.range(foldLine.range, 0, 14, 0, 19);
-        assert.range(fold.range,     0, 14, 0, 19);
-        insert(0, 14, "1");
-        assert.range(foldLine.range, 0, 15, 0, 20);
-        assert.range(fold.range,     0, 15, 0, 20);
-        insert(0, 20, "2");
-        assert.range(foldLine.range, 0, 15, 0, 20);
-        assert.range(fold.range,     0, 15, 0, 20);
+        insert(0, 0, "0", session);
+        assert.range(foldLine.range, 0, 14, 0, 19, session);
+        assert.range(fold.range,     0, 14, 0, 19, session);
+        insert(0, 14, "1", session);
+        assert.range(foldLine.range, 0, 15, 0, 20, session);
+        assert.range(fold.range,     0, 15, 0, 20, session);
+        insert(0, 20, "2", session);
+        assert.range(foldLine.range, 0, 15, 0, 20, session);
+        assert.range(fold.range,     0, 15, 0, 20, session);
 
         // Second line.
         foldLine = session.$foldData[1];
         folds = foldLine.folds;
 
-        insert(1, 0, "3");
+        insert(1, 0, "3", session);
         assert.range(foldLine.range, 1, 11, 2, 25);
         assert.range(folds[0].range, 1, 11, 2, 10);
         assert.range(folds[1].range, 2, 20, 2, 25);
 
-        insert(1, 11, "4");
+        insert(1, 11, "4", session);
         assert.range(foldLine.range, 1, 12, 2, 25);
         assert.range(folds[0].range, 1, 12, 2, 10);
         assert.range(folds[1].range, 2, 20, 2, 25);
 
-        insert(2, 10, "5");
+        insert(2, 10, "5", session);
         assert.range(foldLine.range, 1, 12, 2, 26);
         assert.range(folds[0].range, 1, 12, 2, 10);
         assert.range(folds[1].range, 2, 21, 2, 26);
 
-        insert(2, 21, "6");
+        insert(2, 21, "6", session);
         assert.range(foldLine.range, 1, 12, 2, 27);
         assert.range(folds[0].range, 1, 12, 2, 10);
         assert.range(folds[1].range, 2, 22, 2, 27);
 
-        insert(2, 27, "7");
+        insert(2, 27, "7", session);
         assert.range(foldLine.range, 1, 12, 2, 27);
         assert.range(folds[0].range, 1, 12, 2, 10);
         assert.range(folds[1].range, 2, 22, 2, 27);
@@ -821,38 +821,30 @@ module.exports = {
         var session = createFoldTestSession(),
             undoManager = session.getUndoManager(),
             foldLines = session.$foldData;
-        function insert(row, column, text) {
-            session.insert({row: row, column: column}, text);
-            // Force the session to store all changes made to the document NOW
-            // on the undoManager's queue. Otherwise we can't undo in separate
-            // steps later.
-            session.$syncInformUndoManager();
-        }
-
         var foldLines = session.$foldData;
 
-        insert(0, 0, "\nfo0");
+        insert(0, 0, "\nfo0", session);
         assert.equal(foldLines.length, 2);
         assert.range(foldLines[0].range, 1, 16, 1, 21);
         assert.range(foldLines[1].range, 2, 10, 3, 25);
 
-        insert(2, 0, "\nba1");
+        insert(2, 0, "\nba1", session);
         assert.equal(foldLines.length, 2);
         assert.range(foldLines[0].range, 1, 16, 1, 21);
         assert.range(foldLines[1].range, 3, 13, 4, 25);
 
-        insert(3, 10, "\nfo2");
+        insert(3, 10, "\nfo2", session);
         assert.equal(foldLines.length, 2);
         assert.range(foldLines[0].range, 1, 16, 1, 21);
         assert.range(foldLines[1].range, 4,  6, 5, 25);
 
-        insert(5, 10, "\nba3");
+        insert(5, 10, "\nba3", session);
         assert.equal(foldLines.length, 3);
         assert.range(foldLines[0].range, 1, 16, 1, 21);
         assert.range(foldLines[1].range, 4,  6, 5, 10);
         assert.range(foldLines[2].range, 6, 13, 6, 18);
 
-        insert(6, 18, "\nfo4");
+        insert(6, 18, "\nfo4", session);
         assert.equal(foldLines.length, 3);
         assert.range(foldLines[0].range, 1, 16, 1, 21);
         assert.range(foldLines[1].range, 4,  6, 5, 10);
@@ -1130,7 +1122,7 @@ module.exports = {
         assertArray(session.getAnnotations(), [annotation]);
     },
     
-    "test: mode loading" : function(next) {
+    "test: mode loading" : async function(next) {
         delete EditSession.prototype.$modes["ace/mode/javascript"];
         delete EditSession.prototype.$modes["ace/mode/css"];
         delete EditSession.prototype.$modes["ace/mode/sh"];
@@ -1174,23 +1166,23 @@ module.exports = {
         });
         assert.equal(session.$modeId, "ace/mode/sh");
         assert.equal(session.$mode.$id, "ace/mode/javascript");
-        setTimeout(function() {
-            assert.equal(modeChangeCallbacks, 2);
-            session.setMode("ace/mode/javascript");
-            assert.equal(session.$mode.$id, "ace/mode/javascript");
-            session.setMode("ace/mode/sh");
-            assert.equal(session.$mode.$id, "ace/mode/sh");
-            session.setMode("ace/mode/css");
-            assert.equal(session.$mode.$id, "ace/mode/sh");
-            // destory session to check if the last mode which is being loaded is aborted or not
-            session.destroy();
-            setTimeout(function() {
-            // check if last setmode is aborted due to destroy
-            assert.equal(onChangeModeCallCount, 4);
-            session.$onChangeMode = originalOnChangeMode;
-            next();
-            });
-        });
+
+        await lang.sleep(0);
+        assert.equal(modeChangeCallbacks, 2);
+        session.setMode("ace/mode/javascript");
+        assert.equal(session.$mode.$id, "ace/mode/javascript");
+        session.setMode("ace/mode/sh");
+        assert.equal(session.$mode.$id, "ace/mode/sh");
+        session.setMode("ace/mode/css");
+        assert.equal(session.$mode.$id, "ace/mode/sh");
+        // destory session to check if the last mode which is being loaded is aborted or not
+        session.destroy();
+
+        await lang.sleep(0);
+        // check if last setmode is aborted due to destroy
+        assert.equal(onChangeModeCallCount, 4);
+        session.$onChangeMode = originalOnChangeMode;
+        next();
     },
 
     "test: sets destroyed flag when destroy called and tokenizer is never null": function() {
@@ -1208,7 +1200,7 @@ module.exports = {
         session.setAnnotations([{row: 0, column: 0, text: "error test", type: "error"}]);
         session.setMode("ace/mode/javascript");
         session = EditSession.fromJSON(JSON.stringify(session));
-        
+
         assert.equal(session.getAnnotations().length, 1);
         assert.equal(session.getMode().$id, "ace/mode/javascript");
         assert.equal(session.getScrollLeft(), 0);
@@ -1216,7 +1208,41 @@ module.exports = {
         assert.equal(session.getValue(), "Hello world!");
     },
 
-    "test: operation handling : when session it not attached to an editor": function(done) {
+    "test: JSON serialization preserves undo/redo history": function() {
+        var session = new EditSession(["Hello world!"]);
+        session.setUndoManager(new UndoManager());
+        var document = session.getDocument();
+
+        insert(0, 12, " test1", session);
+        insert(0, 18, " test2", session);
+        insert(0, 24, " test3", session);
+
+        assert.equal(session.getValue(), "Hello world! test1 test2 test3");
+
+        session.getUndoManager().undo(session);
+        assert.equal(session.getValue(), "Hello world! test1 test2");
+
+        var serialized = JSON.stringify(session);
+        session = EditSession.fromJSON(serialized);
+
+        assert.equal(session.getValue(), "Hello world! test1 test2");
+
+        // Test undo stack works
+        session.getUndoManager().undo(session);
+        assert.equal(session.getValue(), "Hello world! test1");
+
+        session.getUndoManager().undo(session);
+        assert.equal(session.getValue(), "Hello world!");
+
+        // Test redo stack works
+        session.getUndoManager().redo(session);
+        assert.equal(session.getValue(), "Hello world! test1");
+
+        session.getUndoManager().redo(session);
+        assert.equal(session.getValue(), "Hello world! test1 test2");
+    },
+
+    "test: operation handling : when session it not attached to an editor": async function(done) {
         const session = new EditSession("Hello world!");
         const beforeEndOperationSpy = [];
         session.on("beforeEndOperation", () => {
@@ -1235,34 +1261,34 @@ module.exports = {
         // When only start operation is invoked
         session.startOperation({command: {name: "inserting-start"}});
         session.insert({row: 0, column : 0}, "start");
-        setTimeout(() => {
-            assert.equal(beforeEndOperationSpy.length, 2);
-            assert.equal(beforeEndOperationSpy[1].command.name, "inserting-start");
-            assert.equal(beforeEndOperationSpy[1].docChanged, true);
-            assert.equal(beforeEndOperationSpy[1].selectionChanged, true);
-            
-            // When only end operation is invoked
-            session.insert({row: 0, column : 0}, "end");
-            session.endOperation();
-            assert.equal(beforeEndOperationSpy.length, 3);
-            assert.deepEqual(beforeEndOperationSpy[2].command, {});
-            assert.equal(beforeEndOperationSpy[2].docChanged, true);
-            assert.equal(beforeEndOperationSpy[2].selectionChanged, true);
 
-            // When nothing is invoked
-            session.insert({row: 0, column : 0}, "none");
-            setTimeout(() => {
-                assert.equal(beforeEndOperationSpy.length, 4);
-                assert.deepEqual(beforeEndOperationSpy[3].command, {});
-                assert.equal(beforeEndOperationSpy[3].docChanged, true);
-                assert.equal(beforeEndOperationSpy[3].selectionChanged, true);
-                
-                done();
-            }, 10);
-        }, 10);
+        await lang.sleep(10);
+        assert.equal(beforeEndOperationSpy.length, 2);
+        assert.equal(beforeEndOperationSpy[1].command.name, "inserting-start");
+        assert.equal(beforeEndOperationSpy[1].docChanged, true);
+        assert.equal(beforeEndOperationSpy[1].selectionChanged, true);
+
+        // When only end operation is invoked
+        session.insert({row: 0, column : 0}, "end");
+        session.endOperation();
+        assert.equal(beforeEndOperationSpy.length, 3);
+        assert.deepEqual(beforeEndOperationSpy[2].command, {});
+        assert.equal(beforeEndOperationSpy[2].docChanged, true);
+        assert.equal(beforeEndOperationSpy[2].selectionChanged, true);
+
+        // When nothing is invoked
+        session.insert({row: 0, column : 0}, "none");
+
+        await lang.sleep(10);
+        assert.equal(beforeEndOperationSpy.length, 4);
+        assert.deepEqual(beforeEndOperationSpy[3].command, {});
+        assert.equal(beforeEndOperationSpy[3].docChanged, true);
+        assert.equal(beforeEndOperationSpy[3].selectionChanged, true);
+
+        done();
     },
 
-    "test: operation handling : when session is attached to an editor": function(done) {
+    "test: operation handling : when session is attached to an editor": async function(done) {
         const session = new EditSession("Hello world!");
         const editor = new Editor(new MockRenderer(), session);
         const beforeEndOperationSpySession = [];
@@ -1322,14 +1348,12 @@ module.exports = {
 
         // Imperative implicit update from editor
         editor.insert("update");
-        setTimeout(() => {
-            assert.equal(beforeEndOperationSpyEditor.length, 5);
-            assert.equal(beforeEndOperationSpyNewSession.length, 2);
-            done();
-        }, 10);
+
+        await lang.sleep(10);
+        assert.equal(beforeEndOperationSpyEditor.length, 5);
+        assert.equal(beforeEndOperationSpyNewSession.length, 2);
+        done();
     }
 };
 
-if (typeof module !== "undefined" && module === require.main) {
-    require("asyncjs").test.testcase(module.exports).exec();
-}
+require("./test/run")(module);

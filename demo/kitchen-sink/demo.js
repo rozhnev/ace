@@ -68,23 +68,63 @@ require("ace/config").defineOptions(Editor.prototype, "editor", {
 require("ace/config").defineOptions(Editor.prototype, "editor", {
     useAceLinters: {
         set: function(val) {
-            if (val && !window.languageProvider) {
-                loadLanguageProvider(editor);
+            var enabled = !!val;
+            if (enabled && !window.languageProvider) {
+                loadLanguageProvider(this);
             }
-            else if (val) {
+            else if (enabled) {
                 window.languageProvider.registerEditor(this);
             } else {
                 if (window.languageProvider) {
-                    window.languageProvider.unregisterEditor(editor, true);
+                    window.languageProvider.unregisterEditor(this, true);
+                    window.languageProvider = null;
+                }
+                if (this.getOption("useAceSpellCheck")) {
+                    this.setOption("useAceSpellCheck", false);
+                    saveOption("useAceSpellCheck", false);
+                    if (env.optionsPanel) {
+                        env.optionsPanel.editor = this;
+                        env.optionsPanel.render();
+                    }
                 }
             }
         }
     }
 });
 
+require("ace/config").defineOptions(Editor.prototype, "editor", {
+    useAceSpellCheck: {
+        set: function(val) {
+            var nextValue = !!val;
+            if (window.useAceSpellCheck === nextValue) return;
+            window.useAceSpellCheck = nextValue;
+            if (nextValue && !this.getOption("useAceLinters")) {
+                this.setOption("useAceLinters", true);
+                saveOption("useAceLinters", true);
+                if (env.optionsPanel) {
+                    env.optionsPanel.editor = this;
+                    env.optionsPanel.render();
+                }
+                return;
+            }
+            if (window.languageProvider && this.getOption("useAceLinters")) {
+                window.languageProvider.unregisterEditor(this, true);
+                window.languageProvider = null;
+                loadLanguageProvider(this);
+            }
+        },
+        get: function() {
+            return window.useAceSpellCheck !== false;
+        },
+        handlesSet: true
+    }
+});
+
 var {HoverTooltip} = require("ace/tooltip");
 var MarkerGroup = require("ace/marker_group").MarkerGroup;
 var docTooltip = new HoverTooltip();
+window.useAceSpellCheck = true;
+
 function loadLanguageProvider(editor) {
     function loadScript(cb) {
         if (define.amd) {
@@ -102,7 +142,22 @@ function loadLanguageProvider(editor) {
         }
     }
     loadScript(function(LanguageProvider) {
-        var languageProvider = LanguageProvider.fromCdn("https://mkslanc.github.io/ace-linters/build", {
+        var services = [];
+        if (window.useAceSpellCheck !== false) {
+            services.push({
+                name: "ace-spell-check",
+                className: "AceSpellCheck",
+                modes: "*",
+                script: "ace-spell-check.js",
+                cdnUrl: "https://unpkg.com/ace-spell-check@latest/build"
+            });
+        }
+
+        var languageProvider = LanguageProvider.fromCdn({
+            services: services,
+            serviceManagerCdn:"https://mkslanc.github.io/ace-linters/build",
+            includeDefaultLinters: true
+        }, {
             functionality: {
                 hover: true,
                 completion: {
@@ -352,24 +407,27 @@ doclist.addToHistory = function(name) {
         h.index = h.push(name);
     }
 };
+
+var initDoc = (session) => {
+    if (!session)
+        return;
+    doclist.addToHistory(session.name);
+    session = env.split.setSession(session);
+    whitespace.detectIndentation(session);
+    optionsPanel.render();
+    env.editor.focus();
+    if (diffView) {
+        diffView.detach()
+        diffView = createDiffView({
+            inline: "b",
+            editorB: editor,
+            valueA: editor.getValue()
+        });
+    }
+}
+
 doclist.pickDocument = function(name) {
-    doclist.loadDoc(name, function(session) {
-        if (!session)
-            return;
-        doclist.addToHistory(session.name);
-        session = env.split.setSession(session);
-        whitespace.detectIndentation(session);
-        optionsPanel.render();
-        env.editor.focus();
-        if (diffView) {
-            diffView.detach()
-            diffView = createDiffView({
-                inline: "b",
-                editorB: editor,
-                valueA: editor.getValue()
-            });
-        }
-    });
+    doclist.loadDoc(name, initDoc);
 };
 
 
@@ -423,7 +481,7 @@ optionsPanel.add({
             }
         },
         "Show diffs": {
-            position: 0,
+            position: -102,
             type: "buttonBar",
             path: "diffView",
             values: ["None", "Inline"],
@@ -489,6 +547,10 @@ optionsPanel.add({
             position: 3000,
             path: "useAceLinters"
         },
+        "Use Spell Checker": {
+            position: 3001,
+            path: "useAceSpellCheck"
+        },
         "Show whitespaces in selection": {
             position: 3100,
             path: "showWhitespacesInSelection"
@@ -520,8 +582,23 @@ env.editor.on("changeSession", function() {
     }
 });
 
-optionsPanel.setOption("doc", util.getOption("doc") || "JavaScript");
+if (localStorage.last_session) {
+    try {
+        var sessionObj = JSON.parse(localStorage.last_session);
+        var session = EditSession.fromJSON(localStorage.last_session);
+        session.name = sessionObj.name;
+        var cachedDoc = doclist.fileCache[session.name.toLowerCase()];
+        if (cachedDoc) {
+            cachedDoc.session = session;
+        }
+        initDoc(session);
+    } catch (e) {
+        console.error(e);
+        optionsPanel.setOption("doc", util.getOption("doc") || "JavaScript");
+    }
+}
 for (var i in optionsPanel.options) {
+    if (i === "doc") continue;
     var value = util.getOption(i);
     if (value != undefined) {
         if ((i == "mode" || i == "theme") && !/[/]/.test(value))
@@ -529,6 +606,7 @@ for (var i in optionsPanel.options) {
         optionsPanel.setOption(i, value);
     }
 }
+optionsPanel.render();
 
 
 function synchroniseScrolling() {
@@ -598,6 +676,32 @@ optionsPanelContainer.insertBefore(
         ]
     ]),
     optionsPanelContainer.children[1]
+);
+
+
+var resetSession = () => {
+    if (localStorage) {
+        localStorage.last_session = undefined;
+    }
+    try {
+        var session = env.editor.session;
+        if (session.name)
+            var cachedDoc = doclist.fileCache[session.name.toLowerCase()];
+        if (cachedDoc) {
+            cachedDoc.session = undefined;
+        }
+        optionsPanel.setOption("doc", util.getOption("doc") || "JavaScript");
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+optionsPanelContainer.insertBefore(
+    dom.buildDom(["div", {style: "text-align:center;width: 100%"},
+        ["div", {},
+            ["button", {onclick: resetSession}, "Reset session"]],
+    ]),
+    optionsPanelContainer.children[0]
 );
 
 function openTestDialog(animateHeight) {
@@ -726,3 +830,11 @@ function moveFocus() {
     else
         env.editor.focus();
 }
+
+window.onbeforeunload = function () {
+    if (env.editor && localStorage) {
+        var sessionObj = env.editor.session.toJSON();
+        sessionObj.name = util.getOption("doc") || "JavaScript";
+        localStorage.last_session = JSON.stringify(sessionObj);
+    }
+};

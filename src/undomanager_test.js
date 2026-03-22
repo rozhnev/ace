@@ -1,5 +1,4 @@
 if (typeof process !== "undefined") {
-    require("amd-loader");
     require("./test/mockdom");
 }
 
@@ -12,6 +11,7 @@ var Editor = require("./editor").Editor;
 var EditSession = require("./edit_session").EditSession;
 var MockRenderer = require("./test/mockrenderer").MockRenderer;
 var UndoManager = require("./undomanager").UndoManager;
+var lang = require("./lib/lang");
 
 var editor, session, undoManager;
 
@@ -27,35 +27,35 @@ module.exports = {
         editor.setSession(session);
     },
 
-    "test: merging": function(done) {
+    "test: merging": async function(done) {
         editor.session.setValue("-");
         editor.execCommand("insertstring", "a");
         editor.execCommand("insertstring", "b");
         editor.execCommand("insertstring", "c");
         editor.execCommand("gotolinestart");
-        // TODO remove setTimeout when timeout from informUndoManager is removed 
-        setTimeout(function() {
-            editor.execCommand("insertstring", "x");
-            editor.execCommand("insertstring", "y");
-            editor.execCommand("insertstring", "z");
-            editor.execCommand("undo");
-            assert.equal(editor.getValue(), "abc-");
-            editor.execCommand("redo");
-            assert.equal(editor.getValue(), "xyzabc-");
-            editor.execCommand("gotolineend");
 
-            editor.execCommand("insertstring", "k");
-            editor.execCommand("insertstring", "l");
-            setTimeout(function() {
-                editor.sequenceStartTime = Date.now() - 3000;
-                editor.execCommand("insertstring", "m");
-                editor.execCommand("insertstring", "n");
-                assert.equal(editor.getValue(), "xyzabc-klmn");
-                editor.execCommand("undo");
-                assert.equal(editor.getValue(), "xyzabc-kl");
-                done();
-            });
-        });
+        // TODO remove setTimeout when timeout from informUndoManager is removed
+        await lang.sleep(0);
+        editor.execCommand("insertstring", "x");
+        editor.execCommand("insertstring", "y");
+        editor.execCommand("insertstring", "z");
+        editor.execCommand("undo");
+        assert.equal(editor.getValue(), "abc-");
+        editor.execCommand("redo");
+        assert.equal(editor.getValue(), "xyzabc-");
+        editor.execCommand("gotolineend");
+
+        editor.execCommand("insertstring", "k");
+        editor.execCommand("insertstring", "l");
+
+        await lang.sleep(0);
+        editor.sequenceStartTime = Date.now() - 3000;
+        editor.execCommand("insertstring", "m");
+        editor.execCommand("insertstring", "n");
+        assert.equal(editor.getValue(), "xyzabc-klmn");
+        editor.execCommand("undo");
+        assert.equal(editor.getValue(), "xyzabc-kl");
+        done();
     },
     "test: reabsing": function() {
         session.setValue("012345-012345-012345");
@@ -435,6 +435,4 @@ module.exports = {
 };
 
 
-if (typeof module !== "undefined" && module === require.main) {
-    require("asyncjs").test.testcase(module.exports).exec();
-}
+require("./test/run")(module);
